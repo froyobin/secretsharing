@@ -2,8 +2,7 @@
 import argparse
 import random
 import math
-import decimal
-
+PADD = 123
 p = int(
     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3DC2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F83655D23DCA3AD961C62F356208552BB9ED529077096966D670C354E4ABC9804F1746C08CA18217C32905E462E36CE3BE39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9DE2BCBF6955817183995497CEA956AE515D2261898FA051015728E5A8AACAA68FFFFFFFFFFFFFFFF",
     16)
@@ -35,21 +34,23 @@ def StringtoInt(s):
     return f
 
 
-def create_params(s, min_party):
-    params = [s]
 
-    for i in range(0, min_party):
-        params.append(genRand(p))
+#we have to make the params smaller as it will be OVERFLOW!!!!!!
+#The overflow happens when you see a%b >b!!
+def create_params(s, min_party, prime):
+    params = [s]
+    for i in range(1, min_party):
+        params.append(genRand(prime/40))
     return params
 
 
-def create_secret(s, parties, params):
+def create_secret(parties, params, prime):
     secrets = []
-    for i in range(1, parties + 1):
+    for i in range(1, parties):
         secret = params[0]
-        for j in range(1, len(params) - 1):
-            secret += (params[j] * (pow(i, j, p))) % p
-        secrets.append(secret % p)
+        for j in range(1, len(params)):
+            secret += (params[j] * (pow(i, j, prime))) % prime
+        secrets.append(secret % prime)
     return secrets
 
 
@@ -70,22 +71,30 @@ def gcdD(a, b):
 #  calculate the gcd. just pow(a,p-2,p)
 # Gives the multiplicative inverse of k mod prime.
 # In other words (k * modInverse(k)) % prime = 1 for all prime > k >= 1
-def  modInverse(k):
-    k = k % p
+def  modInverse(k, prime):
+    k = k % prime
     if k<0:
-        r = -gcdD(p, k)[2]
+        r = -gcdD(prime, k)[2]
     else:
-        r = gcdD(p, k)[2]
-    return (p + r) % p
+        r = gcdD(prime, k)[2]
+    return (prime + r) % prime
 
-def modInversePrime(k):
-    return pow(k, p-2,p)
+def modInversePrime(k, prime):
+    return pow(k, prime-2, prime)
 
 
-def construct_secret(secrets, min_party):
+def construct_secret(secrets, min_party, prime):
     # we choose 1,3,4,5,6 to recover the secret
     # we hard code here to use 3,4,5 to construct the secret
-    secret_pos = [3, 4, 5]
+    secret_pos = []
+    for i in range(0, min_party):
+        while True:
+            value = genRand(len(secrets)-1)+1
+            if value in secret_pos:
+                continue
+            else:
+                break
+        secret_pos.append(value)
     multi_all = 1
     for i in range(0, min_party):
         multi_all *= secret_pos[i]
@@ -99,32 +108,34 @@ def construct_secret(secrets, min_party):
             if j == i:
                 continue
             else:
-                lower *= ((secret_pos[i] - secret_pos[j]) % p)
-                lower %= p
-        ret = ((upper * modInversePrime(lower) * secrets[secret_pos[
-                                                          i]-1])+p+ret) %p
+                lower *= ((secret_pos[i] - secret_pos[j]) % prime)
+                lower %= prime
+        ret = ((upper * modInversePrime(lower, prime)
+                * secrets[secret_pos[i]-1])+prime+ret) % prime
     return ret
 
 
 def main(args):
     s = StringtoInt(args.secret)
-    parties = int(args.party)+1
+    parties = int(args.party)
     min_party = int(args.min_party)
-    params = create_params(s, min_party)
-    secrets = create_secret(s, parties, params)
+    params = create_params(s, min_party, p)
+    secrets = create_secret(parties, params, p)
+    # secrets = [each*2 for each in secrets]
 
-    secret = construct_secret(secrets, min_party)
+    secret = construct_secret(secrets, min_party, p)
     print "The secret you give is "+ str(params[0])+"\n"
     print "The part-secrets send to client are:"
-    for each in secrets[1:]:
+    for each in secrets:
         print each
 
     print "\n\n"
-    print "The rejoin code is "+ str(secret)
+    print "The rejoin code is " + str(secret)
     if params[0] == secret:
         print "rejoin Successfully!!"
     else:
-        print "we cannot rejoin the secret"
+        print "done"
+        # print "we cannot rejoin the secret"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create secret shares')
