@@ -15,14 +15,21 @@ h = int(
     16)
 
 
-def create_verifies(params, p, g):
+def create_verifies(params1, params2, p, g, h):
     verifies = []
-    for each in params:
-        verifies.append(pow(g, each, p))
+    for i in range(0, len(params1)):
+        verifies.append((pow(g, params1[i], p) * pow(h, params2[i], p)) % p)
     return verifies
 
 
-def calculate_left(verfies, i, t, p, g):
+def verify_each(i, verifies, len_pamras):
+    left_value = 1
+    for j in range(0, len_pamras):
+        upper = pow(i, j, p)
+        left_value *= pow(verifies[j], upper, p)
+
+
+def calculate_left(verfies, i, t, p):
     powerall = [1]
     for each_t in range(1, t):
         powerall.append(pow(i, each_t))
@@ -31,39 +38,76 @@ def calculate_left(verfies, i, t, p, g):
         c = pow(verfies[j], powerall[j], p)
         left_val *= c
         left_val %= p
-    return left_val
+    return left_val % p
 
 
-def verifies_shares(secrets, verifies, params,p,g):
-    for i in range(0, len(secrets)):
-        left_value = calculate_left(verifies, i+1, len(params), p, g)
-        right_value = pow(g, (secrets[i]), p)
+def verifies_shares(secrets1, secrets2, verifies, params,p,g):
+    for i in range(0, len(secrets1)):
+        left_value = calculate_left(verifies, i+1, len(params), p)
+        right_value = (pow(g, (secrets1[i])%p, p)*pow(h, (secrets2[i])%p, p))%p
         if left_value == right_value:
             print "checking %d Successfully!!" % i
         else:
             print "secret  %d has been modified!!" % i
 
 
+
+def test_prime():
+
+
+    n_length = 2048
+
+
+    q= (p-1)%2
+    print q
+    print number.isPrime((p-1)/2)
+
+    primeNum1 = number.getPrime(n_length)
+    # primeNum2 = number.getStrongPrime(n_length, primeNum1)
+    i=2
+    while True:
+        pl = p-1
+        print i
+        if pl%i == 0:
+            if number.isPrime(pl / i):
+                print "############"
+                print i
+                print "############"
+                break
+
+        i += 1
+        if i==10000:
+            break
+    print "found!!"
+
+    print "############################"
+    print primeNum1
+    print "############################"
+
+
 def main(args):
     s = shamir_secret_sharing.StringtoInt(args.secret)
     parties = int(args.party)
     min_party = int(args.min_party)
-    params = shamir_secret_sharing.create_params(s, min_party, p)
-    secrets = shamir_secret_sharing.create_secret(parties, params, p)
-    verifies = create_verifies(params, p, g)
-    verifies_shares(secrets, verifies, params, p, g)
-    secret = shamir_secret_sharing.construct_secret(secrets, min_party, p)
-    print "The secret you give is " + str(params[0]) + "\n"
+    params1 = shamir_secret_sharing.create_params(s, min_party, p)
+    params2 = shamir_secret_sharing.create_params(s, min_party, p)
+    secrets1 = shamir_secret_sharing.create_secret(parties, params1, p)
+    secrets2 = shamir_secret_sharing.create_secret(parties, params2, p)
+    secret = shamir_secret_sharing.construct_secret(secrets1, min_party, p)
+    verifies = create_verifies(params1, params2, p, g, h)
+    verifies_shares(secrets1, secrets2, verifies, params2, p, g)
+    print "The secret you give is " + str(params1[0]) + "\n"
 
     print "The rejoin code is " + str(secret)
-    if params[0] == secret:
+    if params1[0] == secret:
         print "rejoin Successfully!!"
     else:
         print "we cannot rejoin the secret"
 
-    #We change secret 1's secret and see whether we can check it out
-    secrets[2] = secrets[2]-1
-    verifies_shares(secrets, verifies, params, p, g)
+    #We change secret2 3's secret and see whether we can check it out
+    secrets2[3] -= 1
+    verifies_shares(secrets1, secrets2, verifies, params2, p, g)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create secret shares')
